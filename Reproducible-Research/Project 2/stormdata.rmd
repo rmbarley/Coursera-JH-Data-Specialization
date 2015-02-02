@@ -1,0 +1,280 @@
+---
+title: "Analyzing the Effect of Extreme Weather Effects on Public Health and Economics Using the NOAA Storm Database "
+author: "Ryan Barley"
+date: "Thursday, December 18, 2014"
+output: html_document
+---
+```{r library}
+## Install and load required libraries
+if (!(require(ggplot2, quietly=T))) {
+    install.packages('ggplot2')
+}
+library(ggplot2)
+```
+
+# Analyzing the Effect of Extreme Weather Effects on Public Health and Economics  Using the NOAA Storm Database #
+
+## Synopsis
+The data for this analysis came from the U.S. National Ocean and Atmospheric Administration's database of extreme weather events from 1956 to 2011. With our data, we want to answer 2 questions: What kinds of storm events are 
+the most harmful to the populations health, and what kinds of storm events
+have the greatest impact to the affected area's economy? In our analysis we found that tornadoes, hurricanes, extreme wind, floods, and heat were the most destructive weather events in terms of these criteria. The data was processed and analyzed using the R language.
+
+## Loading and Processing the Raw Data
+
+We first download and read in the U.S. National Oceanic and Atmospheric Administration's(NOAA) storm database.
+
+```{r loading}
+dir.create("./data", showWarnings=FALSE) 
+
+if(!file.exists("./data/StormData.csv.bz2")){
+    url = "http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+    download.file(url, destfile = "./data/StormData.csv.bz2", method = "auto")
+}
+
+con <- bzfile("./data/StormData.csv.bz2", "rt")
+data <- read.csv(con)
+close(con)
+```
+
+After reading in the data, we check the first few rows of the dataset.
+
+```{r head}
+head(data)
+```
+
+There is much more information in this dataset than we need to answer our
+questions. To make it more manageable, we will subset out all of the information
+having to do with damage to persons and property.
+
+```{r subset}
+data.subset <- subset(data, select = c("EVTYPE", "FATALITIES", "INJURIES",
+                                       "PROPDMG", "PROPDMGEXP", 
+                                        "CROPDMG", "CROPDMGEXP"))
+```
+
+First we will look at how harmful different storm events are to the population.
+looking at the levels of the variable EVTYPE, we see there is a lot of
+redundancy. 
+
+```{r evtype}
+x <- levels(factor((data.subset$EVTYPE)))
+length(x) 
+head(levels(factor(data.subset$EVTYPE)))
+```
+
+To fix this, we will try to sort as many of these events as we can into 
+super-classes. The rest will be cleaned up in a moment.
+
+```{r replacetype}
+data.subset$EVTYPE <- toupper(data.subset$EVTYPE)
+## Trim leading and trailing space using regex
+trim <- function (x) gsub("^\\s+|\\s+$", "", x)
+data.subset$EVTYPE <- trim(data.subset$EVTYPE)
+
+data.subset$EVTYPE[grepl("FLOOD", data.subset$EVTYPE)] <- "FLOOD"
+data.subset$EVTYPE[grepl("STREAM", data.subset$EVTYPE)] <- "FLOOD"
+data.subset$EVTYPE[grepl("RISING", data.subset$EVTYPE)] <- "FLOOD"
+data.subset$EVTYPE[grepl("URBAN", data.subset$EVTYPE)] <- "FLOOD"
+data.subset$EVTYPE[grepl("COLD", data.subset$EVTYPE)] <- "COLD/WIND CHILL"
+data.subset$EVTYPE[grepl("THERMIA", data.subset$EVTYPE)] <- "COLD/WIND CHILL"
+data.subset$EVTYPE[grepl("HEAT", data.subset$EVTYPE)] <- "HEAT"
+data.subset$EVTYPE[grepl("WARM", data.subset$EVTYPE)] <- "HEAT"
+data.subset$EVTYPE[grepl("HAIL", data.subset$EVTYPE)] <- "HAIL"
+data.subset$EVTYPE[grepl("SNOW", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("BLIZZARD", data.subset$EVTYPE)] <- "BLIZZARD"
+data.subset$EVTYPE[grepl("WINT", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("FREEZING", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("FREEZE", data.subset$EVTYPE)] <- "FROST/FREEZE"
+data.subset$EVTYPE[grepl("FROST", data.subset$EVTYPE)] <- "FROST/FREEZE"
+data.subset$EVTYPE[grepl("ICE", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("ICY", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("MIX", data.subset$EVTYPE)] <- "WINTER WEATHER"
+data.subset$EVTYPE[grepl("VOLCANIC", data.subset$EVTYPE)] <- "VOLCANIC ASH"
+data.subset$EVTYPE[grepl("WIND", data.subset$EVTYPE)] <- "WIND"
+data.subset$EVTYPE[grepl("WND", data.subset$EVTYPE)] <- "WIND"
+data.subset$EVTYPE[grepl("WET", data.subset$EVTYPE)] <- "RAIN"
+data.subset$EVTYPE[grepl("RAIN", data.subset$EVTYPE)] <- "RAIN"
+data.subset$EVTYPE[grepl("DRY", data.subset$EVTYPE)] <- "DROUGHT"
+data.subset$EVTYPE[grepl("RECORD", data.subset$EVTYPE)] <- "EXTREME TEMPERATURE"
+data.subset$EVTYPE[grepl("UNSEASONABLE", data.subset$EVTYPE)] <- "EXTREME TEMPERATURE"
+data.subset$EVTYPE[grepl("EXCESSIVE", data.subset$EVTYPE)] <- "UNUSUAL WEATHER"
+data.subset$EVTYPE[grepl("UNUSUAL", data.subset$EVTYPE)] <- "UNUSUAL WEATHER"
+data.subset$EVTYPE[grepl("THUNDERSTORM", data.subset$EVTYPE)] <- "THUNDERSTORM"
+data.subset$EVTYPE[grepl("TSTM", data.subset$EVTYPE)] <- "THUNDERSTORM"
+data.subset$EVTYPE[grepl("TORN", data.subset$EVTYPE)] <- "TORNADO"
+data.subset$EVTYPE[grepl("FUNNEL", data.subset$EVTYPE)] <- "TORNADO"
+data.subset$EVTYPE[grepl("NADO", data.subset$EVTYPE)] <- "TORNADO"
+data.subset$EVTYPE[grepl("WALL", data.subset$EVTYPE)] <- "TORNADO"
+data.subset$EVTYPE[grepl("FIRE", data.subset$EVTYPE)] <- "WILDFIRE"
+data.subset$EVTYPE[grepl("HURRICANE", data.subset$EVTYPE)] <- "HURRICANE"
+data.subset$EVTYPE[grepl("TROPICAL", data.subset$EVTYPE)] <- "HURRICANE"
+data.subset$EVTYPE[grepl("COASTAL", data.subset$EVTYPE)] <- "HURRICANE"
+data.subset$EVTYPE[grepl("TYPHOON", data.subset$EVTYPE)] <- "HURRICANE"
+data.subset$EVTYPE[grepl("CURRENT", data.subset$EVTYPE)] <- "RIP CURRENT"
+data.subset$EVTYPE[grepl("SURF", data.subset$EVTYPE)] <- "HIGH SURF"
+data.subset$EVTYPE[grepl("SWELL", data.subset$EVTYPE)] <- "HIGH SURF"
+data.subset$EVTYPE[grepl("WAVE", data.subset$EVTYPE)] <- "HIGH SURF"
+data.subset$EVTYPE[grepl("DUST", data.subset$EVTYPE)] <- "DUST"
+data.subset$EVTYPE[grepl("LAND", data.subset$EVTYPE)] <- "DEBRIS FLOW"
+data.subset$EVTYPE[grepl("EROS", data.subset$EVTYPE)] <- "DEBRIS FLOW"
+data.subset$EVTYPE[grepl("ROCK", data.subset$EVTYPE)] <- "DEBRIS FLOW"
+data.subset$EVTYPE[grepl("MUD", data.subset$EVTYPE)] <- "DEBRIS FLOW"
+data.subset$EVTYPE[grepl("LIG", data.subset$EVTYPE)] <- "DEBRIS FLOW"
+data.subset$EVTYPE[grepl("SPOUT", data.subset$EVTYPE)] <- "WATERSPOUT"
+data.subset$EVTYPE[grepl("DEVIL", data.subset$EVTYPE)] <- "DUSTDEVIL"
+data.subset$EVTYPE[grepl("DUST ", data.subset$EVTYPE)] <- "DUST STORM"
+data.subset$EVTYPE[grepl("AVALAN", data.subset$EVTYPE)] <- "AVALANCHE"
+data.subset$EVTYPE[grepl("SEAS", data.subset$EVTYPE)] <- "HEAVY SEAS"
+data.subset$EVTYPE[grepl("FOG", data.subset$EVTYPE)] <- "FOG"
+```
+
+To ascertain how harmful different storms are to the population, we will define
+how harmful a storm event was by looking at the total number of people injured
+and killed. To do this, we will first create a new variable called HARMED, which 
+sums the number of people injured and killed for each event.
+
+```{r harmed}
+data.subset$HARMED <- (data.subset$INJURIES + data.subset$FATALITIES)
+```
+
+We are only interested in storm events that were harmful to the population. If a
+storm event caused no harm to any person, then we can remove it from the dataset.
+
+```{r elim}
+## Remove Events that do not contribute to overall population harm
+elim <- !(grepl(0, data.subset$HARMED))
+data.subset <- data.subset[elim==T,]
+
+levels(factor(data.subset$EVTYPE))
+```
+
+We have successfully narrowed down the number of different storm events around 30. 
+This is fewer than the number in the NOAA code book, but that is okay for our
+purposes.
+
+Next, we will aggregate the number of people harmed with the type of storm 
+event to see the total number of people harmed by each event.
+
+```{r harmedtotal}
+harmed.total <- aggregate(HARMED ~ EVTYPE, data.subset, sum)
+```
+
+Now that we have finished processing the data looking at how harmful these 
+storm events are for people, we can start focusing on our second question:
+how harmful these events are for the economy. 
+
+```{r dmglevel}
+data.subset$PROPDMGEXP <- toupper(data.subset$PROPDMGEXP)
+data.subset$CROPDMGEXP <- toupper(data.subset$CROPDMGEXP)
+
+## Replace factor levels that have been lost in subsetting
+data.subset$PROPDMGEXP <- as.character(data.subset$PROPDMGEXP)
+data.subset$CROPDMGEXP <- as.character(data.subset$CROPDMGEXP)
+
+levels(factor(data.subset$PROPDMGEXP)) # [1] ""  "-" "0" "5" "7" "B" "H" "K" "M"
+levels(data.subset$CROPDMGEXP) # [1] ""  "0" "B" "K" "M"
+```
+
+Looking at this data, we can see that it needs a little bit of cleaning, too.
+The NOAA code book says that the proper entries for the damage exponent column
+are "B" for billion, "M" for million, and "K" for thousand. For the purpose of 
+this assessment, everything else can be ignored. We will set those values to 1.
+
+```{r exponents}
+data.subset$PROPDMGEXP[grepl("-|0|5|7|H", data.subset$PROPDMGEXP)] <- "1"
+data.subset$PROPDMGEXP[grepl("K", data.subset$PROPDMGEXP)] <- "1000"
+data.subset$PROPDMGEXP[grepl("M", data.subset$PROPDMGEXP)] <- "1000000"
+data.subset$PROPDMGEXP[grepl('B', data.subset$PROPDMGEXP)] <- "1000000000"
+
+
+data.subset$CROPDMGEXP[grepl("B", data.subset$CROPDMGEXP)] <- "1000000000"
+data.subset$CROPDMGEXP[grepl("K", data.subset$CROPDMGEXP)] <- "1000"
+data.subset$CROPDMGEXP[grepl("M", data.subset$CROPDMGEXP)] <- "1000000"
+
+data.subset$PROPDMG <- as.numeric(data.subset$PROPDMG)
+data.subset$CROPDMG <- as.numeric(data.subset$CROPDMG)
+
+data.subset$PROPDMGEXP <- as.numeric(data.subset$PROPDMGEXP)
+data.subset$CROPDMGEXP <- as.numeric(data.subset$CROPDMGEXP)
+```
+
+Once these multipliers are in place, we will multiply the damage column by the damage exponent columns for both the property and crop values, and aggregate the
+sum of each.
+
+```{r merging}
+data.subset$TOTALPROP <- data.subset$PROPDMG * data.subset$PROPDMGEXP
+data.subset$TOTALCROP <- data.subset$CROPDMG * data.subset$CROPDMGEXP
+
+prop.total <- aggregate(TOTALPROP ~ EVTYPE, data.subset, sum)
+crop.total <- aggregate(TOTALCROP ~ EVTYPE, data.subset, sum)
+```
+
+# Results
+
+We are now ready to review our data, and answer our original questions.
+
+## 1. What kinds of storm events are the most harmful to the populations health?
+
+To answer this question, we will return to our definition of harm being the sum of injuries and fatalities. Plotting all 33 events on one graph is cumbersome, so for our analysis we chose to limit the number of events we are plotting to the top 10 most harmful. We will rank them by most people harmed, and then subset the top 10 results.
+
+```{r pop}
+harmed.df <- harmed.total[order(harmed.total$HARMED, decreasing = T), ][1:10, ]
+levels(harmed.df$EVTYPE) <- as.character.factor(harmed.df$EVTYPE)
+## This will allow us to sort by factors
+harmed.df$EVTYPE <- factor(harmed.df$EVTYPE, as.character(harmed.df$EVTYPE))
+harmed.df
+```
+
+```{r harmplot, fig.width=15, fig.height=10}
+g <- ggplot(harmed.df, aes(y = HARMED)) 
+g <- g + geom_bar(aes(x = EVTYPE, fill = EVTYPE), data = harmed.df, stat="identity")
+g <- g + labs(title = "10 Most Harmful Storm Events",
+              x = "Storm Event",
+              y = "Number of People Injured or Killed")
+g
+```
+
+From this plot, we see that tornadoes harm much more people than any other storm event, about 60,000 more people each year than the next highest event, wind.
+
+## Question 2: Across the United States, which types of events have the greatest economic consequences?
+
+For this question, we are dividing our answer up into two parts: what storm event caused the most costly damage to property, and which did the most costly damage to crops. Again, we will be looking at the top 10 results
+
+```{r economy}
+prop.df <- prop.total[order(prop.total$TOTALPROP, decreasing = T), ][1:10, ]
+## Numbers are very large, so we will divide the totals by 1000 to normalize
+prop.df$TOTALPROP <- prop.df$TOTALPROP / 1000
+prop.df$EVTYPE <- factor(prop.df$EVTYPE, as.character(prop.df$EVTYPE))
+prop.df
+```
+
+```{r popfig, fig.width=15, fig.height=10}
+p <- ggplot(prop.df, aes(y = TOTALPROP)) 
+p <- p + geom_bar(aes(x = EVTYPE, fill = EVTYPE), data = prop.df, stat="identity")
+p <- p + labs(title = "10 Most Costly Storm Events to Property",
+              x = "Storm Event",
+              y = "Amount of Property Damage Caused (1,000 USD)")
+p
+```
+
+
+Perhaps unsurprisingly, tornadoes do much more damage to property than any other storm event. Since they are the biggest harmers of the population, this makes sense, because if people are getting hurt or killed, it stands to reason that the homes they are in are being damaged as well.
+
+```{r crop}
+crop.df <- crop.total[order(crop.total$TOTALCROP, decreasing = T), ][1:10, ]
+## Values are very large, so we will divide the totals by 1 million
+crop.df$TOTALCROP <- crop.df$TOTALCROP / 1000000
+crop.df$EVTYPE <- factor(crop.df$EVTYPE, as.character(crop.df$EVTYPE))
+crop.df
+```
+
+```{r crop plot, fig.width=15, fig.height=10}
+q <- ggplot(crop.df, aes(y = TOTALCROP)) 
+q <- q + geom_bar(aes(x = EVTYPE, fill = EVTYPE), data = crop.df, stat="identity")
+q <- q + labs(title = "10 Most Costly Storm Events to Crops",
+              x = "Storm Event",
+              y = "Amount of Damage Done to Crops (Million USD)")
+q
+```
+
+More surpring is the fact that hurricanes do the most damage to crops. Tornadoes are number six. However, wind and flood are just as damaging to crops as they are to property.
