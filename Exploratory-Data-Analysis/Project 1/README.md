@@ -1,3 +1,5 @@
+This is a copy of the repo forked from rdpeng here: https://github.com/rmbarley/ExData_Plotting1
+
 ## Introduction
 
 This assignment uses data from
