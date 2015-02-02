@@ -1,0 +1,100 @@
+---
+title: "Tooth Growth Analysis"
+author: "Ryan Barley"
+date: "Saturday, December 20, 2014"
+output: pdf_document
+---
+# Tooth Growth Analysis
+
+## Load and Install Required Libraries
+```{r library}
+if (!(require(ggplot2, quietly=T))) {
+  install.packages('ggplot2')
+}
+library(ggplot2)
+
+## Load in Tooth Growth data
+data(ToothGrowth)
+```
+From the help file, ?ToothGrowth:
+
+"The response is the length of odontoblasts (teeth) in each 
+of 10 guinea pigs at each of three dose levels of Vitamin C (0.5, 1, and 2 mg)
+with each of two delivery methods (orange juice or ascorbic acid)."
+
+## Perform some basic exploratory analysis
+```{r str}
+str(ToothGrowth)
+```
+```{r headtail}
+head(ToothGrowth)
+
+tail(ToothGrowth)
+```
+
+```{r help, fig.height=4}
+## Look at the graph in help
+coplot(len ~ dose | supp, data = ToothGrowth, panel = panel.smooth,
+       xlab = "ToothGrowth data: length vs dose, given type of supplement")
+```
+
+From this plot, it seems clear that we should treat dosage as a factor, as it is the variable being changed in the experiment. We will convert it to a factor 
+for future analysis.
+
+```{r factor}
+## Convert dosage variable to factor
+ToothGrowth$dose <- as.factor(ToothGrowth$dose)
+```
+
+```{r boxplot, fig.height=4}
+## Make new boxplot
+g <- ggplot(ToothGrowth, aes(x = dose, y = len, fill=dose))
+g <- g + geom_boxplot(notch=F) + facet_grid(. ~ supp) + 
+  stat_summary(fun.y = mean, geom = "point", shape = 5, size = 4) + 
+  stat_boxplot(geom ='errorbar')
+g
+```
+
+At first glance, it seems as though both orange juice and ascorbic
+acid have the same effect on tooth length at sufficiently high doses.
+However, it seems like orange juice has a greater effect on tooth growth 
+at a basline 0.5mg dose
+
+## Provide a basic summary of the data.
+
+```{r summary}
+summary(ToothGrowth)
+```
+
+From the summary, we can see that the minimum tooth growth was 4.2
+(though the documentation contains no units for this measurement). 
+This matches up to the minimum value of a 0.5mg dose of ascorbic acid. 
+However, the maximum value also belongs to the ascorbic acid trial.
+
+## Hypothesis Tests
+1. Hypothesis 0.1: There is no difference between OJ and VC in tooth growth.
+
+```{r hyp1}
+t1 <- t.test(len ~ supp, data = ToothGrowth, paired = F, var.equal = T)
+conf1 <- rbind(t1$conf)
+dt1 <- cbind(conf1, t1$p.value)
+colnames(dt1) <- c("Confidence" ,"Interval", "P-Value")
+dt1
+```
+
+We see from this result a confidence interval of approximately [-0.171, 7.57] with a 95% confidence level. Since the confidence interval includes 0 as a mean, and the p-value > 0.05, we can not reject the null hypothesis that there is no difference between the supplement's effect on tooth growth
+
+2. Hypothesis 0.2: Dosage has no effect on tooth growth.
+If dosing has no effect, then there will be no difference between the maximum dosage (2 mg) and minimum dosage (0.5 mg). With this hypothesis, there is no reason to test any other interval.
+
+```{r dosage}
+dose <- subset (ToothGrowth, dose %in% c(0.5, 2.0)) 
+t2 <- t.test(len ~ dose, data = dose, paired = F, var.equal = F)
+conf2 <- rbind(t2$conf)
+dt2 <- cbind(conf2, t2$p.value)
+colnames(dt2) <- c("Confidence" ,"Interval", "P-Value")
+
+dt2
+```
+
+With a p-value on the magnitude of 10^{-14}, we can fairly readily dismiss the null hypothesis that dosage has no effect on tooth growth. In fact, this is a statistically highly significant value. We can therefore conclude that the dosage level of a supplement has a measureable effect on tooth growth.

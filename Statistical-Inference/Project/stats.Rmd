@@ -1,0 +1,79 @@
+---
+title: "Simulating Exponential Distributions in R"
+author: "Ryan Barley"
+date: "Saturday, December 20, 2014"
+output: pdf_document
+---
+```{r library}
+## Install and load required libraries
+if (!(require(ggplot2, quietly=T))) {
+  install.packages('ggplot2')
+}
+library(ggplot2)
+```
+```{r seed}
+## Set the random seed for simulations
+set.seed(1234)
+```
+
+The exponential distribution is defined as $f(x) = \lambda*e^{-\lambda x}$ when $x >= 0$, and 0 otherwise. ($\lambda  > 0$) is defined as the rate parameter of the distribution. The mean of the exponential distribution is ($E[x] = \frac{1}{\lambda}$) and the variance is ($var[x] = \frac{1}{\lambda^2}$).
+
+First, let's explore the exponential distribution with 40 exponentials with a mean and standard deviation of $\frac{1}{\lambda} = \frac{1}{0.2} = 5$
+
+```{r}
+x <- rexp(40, .2)
+x
+mean(x)
+hist(x)
+```
+
+What we see from the histogram of our sample 
+is a typical exponential curve. It is not normal, and it is skewed-right. We also see that the mean is not the predicted 5, but is instead `r mean(x)`.
+
+Now we will up the ante, and simulate 40 random exponentials 1000 times. We will take the mean of each sample and save it to a vector called ev (for expectation value).
+
+```{r simulation}
+lambda <- 0.2
+n <- 40
+index <- rep.int(1:1000, 1)
+ev <- rep(0, 1000)
+for (i in index){
+  ev[i] <- mean(rexp(n, lambda))
+}
+
+df <- data.frame(mean = ev, n = index)
+```
+```{r plot}
+g <- ggplot(df, aes(x = ev))
+g + geom_histogram(aes(y = ..density..), colour = "black", 
+                   fill = "white", binwidth = 0.5) + 
+    xlab("Mean") +
+    ggtitle("Distribution Curve for 1000 Randomly Sampled Exponential Means \n (n = 40, lambda = 0.2)") + 
+    stat_function(fun = dnorm, aes(color = "red"), args = list(mean = mean(ev), 
+                                                               sd = sd(ev))) + 
+    stat_function(fun = dnorm, aes(color = "blue"),
+                  args = list(mean = (1/.2), 
+                              sd = ((1/lambda) / sqrt(n)))) +
+    scale_colour_manual("", values = c("red", "blue"), 
+                        labels = c("Actual Curve", "Expected Curve"))
+```
+
+Just by looking at the histogram, we can tell that the distribution has begun to normalize. We can also see that the highest values of the distribution are clustering around 5, the mean we were aiming for. In fact, the mean of the distribution is `r mean(ev)`, which is very close to approaching 5. The red and blue curves on the plot indicate where the theoretical distribution lies versus where the actual distribution lies.
+
+```{r centers}
+center.theory <- 1/(lambda)
+center.actual <- mean(ev)
+center.error <- ((center.theory - center.actual) / center.theory)*100
+variance.theory <- ((1/lambda) / sqrt(n))^2
+variance.actual <- var(ev)
+variance.error <- ((variance.theory - variance.actual)/variance.theory)*100
+```
+```{r table, echo=FALSE}
+x <- c(center.actual, center.theory, center.error)
+y <- c(variance.actual, variance.theory, variance.error)
+tab <- cbind(x,y)
+colnames(tab) <- c("Center", "Variance")
+rownames(tab) <- c("Actual", "Theoretical", "Error")
+tab
+```
+The mean is very close to being exactly in line with the theoretical predictions; however, the variance is still a small ways away, but with acceptable parameters for the sake of this exercise.
