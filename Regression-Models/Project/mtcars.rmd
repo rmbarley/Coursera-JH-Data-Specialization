@@ -1,0 +1,76 @@
+---
+title: "Analysis of the effect of transmission on the fuel economy of motor vehicles"
+author: "Ryan Barley"
+date: "Tuesday, January 20, 2015"
+output: pdf_document
+---
+## Executive Summary
+This report provides an analysis of the role of transmission type on fuel economy in motor vehicles. The data used was taken from the 'mtcars' dataset in R, which was extracted from the 1974 *Motor Trends* US magazine. The data includes fuel consumption and 10 aspects of automobile design for 32 vehicle models. In this report we want to conclude whether or not an automatic or manual transmission yields a better fuel economy in a motor vehicle. If there is a difference, we want to quantify it. This report includes an exploratory analysis of the 'mtcars' dataset, and a linear additive regression analysis to build a minimally adequate regression model. 
+
+This report finds that, on average, vehicles with manual transmissions have a better fuel economy. However, there are other factors that mitigate the difference, including gross horsepower of the vehicle, the weight of the vehicle, and the number of cylinders in the vehicles engine. The analysis conducted has limitations, first among those being a very small dataset. Also, the data used is fairly outdated, and modern advances in vehicle manufacturing may change the differences found significantly.
+
+
+## Exploratory Analysis
+We start by loading the `mtcars` dataset, and taking a cursory glance at the data. We will do this using the `summary()` function. We will also make a pair-wise scatter plot looking at each variable in relation to each other (Figure 1)
+```{r summary}
+data(mtcars); attach(mtcars); #summary(mtcars)
+```
+By looking at this breakdown, it is clear that some of these variables are dummy variables and some are just coded as numeric when they should be factors. This is easily fixed.
+```{r factors}
+mtcars$cyl <- factor(mtcars$cyl) # Number of cylinders
+mtcars$vs <- factor(mtcars$vs) # V-line/Straight-line engine type
+mtcars$gear <- factor(mtcars$gear) # Number of forward gears 
+mtcars$am <- factor(mtcars$am) # Transmission
+mtcars$carb <- factor(mtcars$carb) # Number of carburetors
+```
+Our first question is whether or not there is a clear difference between the fuel economy of a vehicle with a manual transmission and of one with an automatic transmission. Looking at a box plot of the variables *mpg* and *am* (Figure 2), we can see there is a substantial difference. We can quantify that difference by looking at the mean miles fuel economy of each type of transmission.
+```{r means}
+round(aggregate(mpg ~ am, FUN = mean), 2)
+```
+Where 0 and 1 represent automatic and manual transmission, respectively.
+
+We can also use a two-sided t-test to look at the difference. We define the null hypothesis as there being no difference between automatic and manual transmission in terms of fuel economy (the difference in means is zero):
+```{r ttest}
+t <- t.test(mpg ~ am, data = mtcars)
+```
+Based on a p-value of `r round(t$p.value, 4)`, we can reject the null hypothesis. On the surface, this seems like a cut-and-dry solution, but there might be other factors influencing the fuel economy of a vehicle besides the transmission type.
+
+## Regression Analysis
+Before deciding what regression method would be the best, we will look at a linear additive model using *mpg* as the outcome and every other variable as a predictor. We will also look at the model that only considers *am* as a predictor.
+```{r model1}
+options(show.signif.stars=F)
+model0 <- lm(mpg ~ am)
+model1 <- lm(mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb, data = mtcars)
+summary(model1)$coefficients
+```
+From our linear additive model, we do not see anything truly significant, but we are fairly close with the *hp* and *wt* variables. These are the gross horsepower of the vehicle and the weight of the vehicle (lb/1000), respectively. Next, we will build a minimal adequate model by eliminating insignificant variables one by one. For the sake of space, I have hidden the output of this code.
+```{r minimum adequate}
+model2 <- update(model1, .~. -carb)
+model3 <- update(model2, .~. -drat)
+model4 <- update(model3, .~. -gear)
+model5 <- update(model4, .~. -disp)
+model6 <- update(model5, .~. -qsec)
+model7 <- update(model6, .~. -vs)
+summary(model7)$coefficients
+a <- anova(model0, model1, model7)
+```
+Removing those extra confounding variables contributes to a small difference in our R-squared value, which means we are accounting for less variance, but this happens when predictors are removed. Our adjusted R-squared value, on the other hand, has moved from `r round(summary(model1)$adj.r.squared, 3)` to `r round(summary(model7)$adj.r.squared, 3)`. Nearly each variable is now significant. We also see from the `anova` test, that removing the extra confounding variable from our models had an extremely insignificant effect on our final model.
+
+We can check the confidence interval of our model by
+```{r conf}
+confint(model7, level = .95)
+```
+Thus, we are 95% certain that the difference between fuel economy for different transmissions is between -1.061 and 4.679 miles per gallon, accounting for `r round(summary(model7)$r.squared, 3) * 100`% of variance. We also see that the number of cylinders an engine has, the gross horsepower of the vehicle, and the weight of the vehicle all contribute to fuel economy.
+
+## Diagnostics
+We see in our Residual vs. Fitted plot, the points bounce around the 0 line, thus they are reasonably linear. The variance in the error terms are not equal, due to 3 outliers: The Toyota Corolla, Fiat 128, and Datsun 710, these points warrant further investigation. Based on the Normal Q-Q Plot, our resulting model is roughly normal. (See appendix for these plots)
+\newpage
+
+## Appendix
+```{r appendix, fig.height=4, echo=FALSE}
+plot(mtcars, main = "Figure 1")
+boxplot(mpg ~ am, main = "Figure 2", ylab = "mpg", 
+        xlab = "Transmission Type 0 = Automatic, 1 = Manual")
+par(mfrow = c(2, 2))
+plot(model7)
+```
